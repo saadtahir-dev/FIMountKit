@@ -1,0 +1,12 @@
+[submodule "Dependencies/libewf-spm"]
+	path = Dependencies/libewf-spm
+	url = https://github.com/saadtahir-dev/libewf-spm.git
+[submodule "Dependencies/libvhdi-spm"]
+	path = Dependencies/libvhdi-spm
+	url = https://github.com/saadtahir-dev/libvhdi-spm.git
+[submodule "Dependencies/libcaff4-spm"]
+	path = Dependencies/libcaff4-spm
+	url = https://github.com/saadtahir-dev/libcaff4-spm.git
+[submodule "Dependencies/libvmdk-spm"]
+	path = Dependencies/libvmdk-spm
+	url = https://github.com/saadtahir-dev/libvmdk-spm.git

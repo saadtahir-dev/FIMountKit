@@ -1,0 +1,41 @@
+{
+  "pins" : [
+    {
+      "identity" : "libcaff4-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/saadtahir-dev/libcaff4-spm.git",
+      "state" : {
+        "revision" : "deb666386a9fb06443e85315157a0e66442f1e9d",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "libewf-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/saadtahir-dev/libewf-spm.git",
+      "state" : {
+        "revision" : "ec15315d0ca9d19da7c23677cf84fdc5452c0bbf",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "libvhdi-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/saadtahir-dev/libvhdi-spm.git",
+      "state" : {
+        "revision" : "4fd2bf0fcbc70aec252234a158ff72779ae39555",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "libvmdk-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/saadtahir-dev/libvmdk-spm.git",
+      "state" : {
+        "revision" : "7b226b36e7d074bd145e43750b8608d7b8a2c65d",
+        "version" : "1.0.0"
+      }
+    }
+  ],
+  "version" : 2
+}
