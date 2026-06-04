@@ -19,4 +19,5 @@ public enum ImageType: String, Sendable, Equatable {
     case vmdk
     case vhd
     case aff4
+    case mountedVolume
 }
