@@ -92,7 +92,9 @@ public final class EWFMountManager: @unchecked Sendable {
         }
 
         let rawFile = resolvedMountPoint.appendingPathComponent("ewf1", isDirectory: false)
-        guard fileManager.fileExists(atPath: rawFile.path) else {
+        let rawFileAppeared = await FuseMountWaiter.waitForFile(at: rawFile.path, fileManager: fileManager)
+        
+        guard rawFileAppeared else {
             Logger.log(log, "Missing expected raw file: \(rawFile.path)", level: .error, component: .ewfManager)
             
             let handle = EWFMountHandle(mountPoint: resolvedMountPoint, rawFile: rawFile, isTemporary: isTemporary)

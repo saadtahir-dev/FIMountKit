@@ -80,7 +80,9 @@ public final class VMDKMountManager: @unchecked Sendable {
         }
 
         let rawFile = resolvedMountPoint.appendingPathComponent("vmdk1", isDirectory: false)
-        guard fileManager.fileExists(atPath: rawFile.path) else {
+        let rawFileAppeared = await FuseMountWaiter.waitForFile(at: rawFile.path, fileManager: fileManager)
+        
+        guard rawFileAppeared else {
             Logger.log(log, "Missing expected raw file: \(rawFile.path)", level: .error, component: .vmdkManager)
 
             let handle = VMDKMountHandle(mountPoint: resolvedMountPoint, rawFile: rawFile, isTemporary: isTemporary)

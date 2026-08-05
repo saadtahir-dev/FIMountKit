@@ -80,7 +80,9 @@ public final class VHDIMountManager: @unchecked Sendable {
         }
 
         let rawFile = resolvedMountPoint.appendingPathComponent("vhdi1", isDirectory: false)
-        guard fileManager.fileExists(atPath: rawFile.path) else {
+        let rawFileAppeared = await FuseMountWaiter.waitForFile(at: rawFile.path, fileManager: fileManager)
+        
+        guard rawFileAppeared else {
             Logger.log(log, "Missing expected raw file: \(rawFile.path)", level: .error, component: .vhdiManager)
 
             let handle = VHDIMountHandle(mountPoint: resolvedMountPoint, rawFile: rawFile, isTemporary: isTemporary)
