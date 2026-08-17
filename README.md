@@ -104,9 +104,9 @@ Then in Xcode: **File → Packages → Reset Package Caches** to pick up changes
 | AFF4 | `.aff4` | **Libcaff4** full extract → temp `.img` → `hdiutil` |
 | VMware VMDK | `.vmdk` | `vmdkmount` (FUSE) → `vmdk1` → `hdiutil` |
 | Microsoft VHD | `.vhd` | `vhdimount` (FUSE) → `vhdi1` → `hdiutil` |
-| Split RAW | `.001`, `.002`, … | merge segments → `hdiutil` |
+| Split RAW | `.000`/`.001` + contiguous 3-digit segments | merge from selected part → `hdiutil` |
 
-**Detection vs merge:** `ImageFormatDetector` also maps `.000` and `.00001` to split RAW, but `SplitRawMerger` only merges sets that **start at `.001`**. Use a `.001` first segment for reliable split mounts.
+**Start segment:** pick the first segment you want included — `.000` merges `.000`, `.001`, …; `.001` merges `.001`, `.002`, … (does not prepend `.000` if present). Segments must be contiguous 3-digit suffixes. Sets beyond `.999` are not supported (`.1000` triggers an explicit error).
 
 **Not supported:** `.vhdx`, `.iso`, `.img` (unmapped alias), and formats outside the table above.
 

@@ -9,7 +9,7 @@
 
 import Foundation
 import Testing
-@testable import ImageMounter
+@testable import FIMountKit
 
 @Test func imageFormatDetector_extensionMapping() throws {
     let detector = ImageFormatDetector()
@@ -23,6 +23,7 @@ import Testing
     #expect(try detector.detect(URL(fileURLWithPath: "/tmp/foo.ex01"), log: nil) == .ewf)
     #expect(try detector.detect(URL(fileURLWithPath: "/tmp/foo.s01"), log: nil) == .ewf)
     #expect(try detector.detect(URL(fileURLWithPath: "/tmp/foo.001"), log: nil) == .splitRaw)
+    #expect(try detector.detect(URL(fileURLWithPath: "/tmp/foo.000"), log: nil) == .splitRaw)
     #expect(throws: MountError.detectionFailed) { try detector.detect(URL(fileURLWithPath: "/tmp/foo.unknownext"), log: nil) }
 }
 
@@ -47,7 +48,7 @@ import Testing
                 sourceURL: url,
                 type: supportedTypes[0],
                 deviceIdentifiers: [],
-                mountPoints: [],
+                mountPointURLs: [],
                 temporaryResources: [],
                 metadata: [:]
             )

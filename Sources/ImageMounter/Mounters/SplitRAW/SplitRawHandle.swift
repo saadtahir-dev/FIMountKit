@@ -32,16 +32,25 @@ public final class SplitRawMerger: @unchecked Sendable {
     public func merge(_ firstPart: URL, output: URL? = nil, log: ImageMounterLogHandler? = nil) throws -> SplitRawHandle {
         Logger.log(log, "Starting merge for first part: \(firstPart.path)", component: .splitRawMerger)
         let ext = firstPart.pathExtension
-        guard ext == "001" else {
-            Logger.log(log, "Split RAW must start at .001 (got .\(ext))", level: .error, component: .splitRawMerger)
-            throw MountError.detectionFailed
+        guard ext.count == 3, let startIndex = Int(ext), startIndex == 0 || startIndex == 1 else {
+            Logger.log(
+                log,
+                "Split RAW must start at .000 or .001 (got .\(ext))",
+                level: .error,
+                component: .splitRawMerger
+            )
+            throw MountError.mountFailed(reason: "Split RAW must start at .000 or .001 (got .\(ext))")
         }
 
         let directory = firstPart.deletingLastPathComponent()
         let baseName = firstPart.deletingPathExtension().lastPathComponent
 
-        let parts = try discoverParts(in: directory, baseName: baseName)
-        Logger.log(log, "Discovered \(parts.count) split parts", component: .splitRawMerger)
+        let parts = try discoverParts(in: directory, baseName: baseName, startIndex: startIndex)
+        Logger.log(
+            log,
+            "Discovered \(parts.count) split parts starting at .\(String(format: "%03d", startIndex))",
+            component: .splitRawMerger
+        )
 
         let mergedURL: URL
         let isTemporary: Bool
@@ -149,7 +158,7 @@ public final class SplitRawMerger: @unchecked Sendable {
         }
     }
 
-    private func discoverParts(in directory: URL, baseName: String) throws -> [URL] {
+    private func discoverParts(in directory: URL, baseName: String, startIndex: Int) throws -> [URL] {
         let entries = try fileManager.contentsOfDirectory(atPath: directory.path)
 
         var numbers: [Int] = []
@@ -160,18 +169,28 @@ public final class SplitRawMerger: @unchecked Sendable {
             numbers.append(n)
         }
 
-        let sorted = Array(Set(numbers)).sorted()
-        guard sorted.first == 1 else {
-            throw MountError.mountFailed(reason: "Split RAW must start at .001")
+        let available = Set(numbers)
+        guard available.contains(startIndex) else {
+            let selected = String(format: "%03d", startIndex)
+            throw MountError.mountFailed(reason: "Missing selected split part: \(baseName).\(selected)")
         }
 
-        for (idx, n) in sorted.enumerated() {
-            if n != idx + 1 {
+        let candidates = available.filter { $0 >= startIndex }.sorted()
+        for (offset, n) in candidates.enumerated() {
+            if n != startIndex + offset {
                 throw MountError.mountFailed(reason: "Split RAW parts are not contiguous (gap detected)")
             }
         }
 
-        return sorted.map { n in
+        if candidates.last == 999 {
+            let nextSegment = "\(baseName).1000"
+            if entries.contains(nextSegment) {
+                // ponytail: TODO 4-digit suffix support if needed
+                throw MountError.mountFailed(reason: "Split RAW exceeds 3-digit segment limit (.1000 present)")
+            }
+        }
+
+        return candidates.map { n in
             let ext = String(format: "%03d", n)
             return directory.appendingPathComponent("\(baseName).\(ext)", isDirectory: false)
         }
