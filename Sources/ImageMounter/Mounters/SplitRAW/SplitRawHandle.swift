@@ -89,10 +89,7 @@ public final class SplitRawMerger: @unchecked Sendable {
                 withIntermediateDirectories: true
             )
 
-            let totalSize = try parts.reduce(0 as Int64) { acc, url in
-                let attrs = try fileManager.attributesOfItem(atPath: url.path)
-                return acc + (attrs[.size] as? Int64 ?? 0)
-            }
+            let totalSize = try totalSize(of: parts)
 
             if fileManager.fileExists(atPath: mergedURL.path) {
                 let existingSize = (try fileManager.attributesOfItem(atPath: mergedURL.path)[.size] as? Int64) ?? 0
@@ -196,6 +193,32 @@ public final class SplitRawMerger: @unchecked Sendable {
                 try? fileManager.removeItem(at: mergedURL)
             }
             throw error
+        }
+    }
+
+    /// Bytes that would be copied onto the destination volume for this split set.
+    /// `nil` when no copy runs (not a `.000`/`.001` start, or a single-part set).
+    public func requiredCopySize(for firstPart: URL) throws -> Int64? {
+        let ext = firstPart.pathExtension
+        guard ext.count == 3, let startIndex = Int(ext), startIndex == 0 || startIndex == 1 else {
+            return nil
+        }
+
+        let directory = firstPart.deletingLastPathComponent()
+        let baseName = firstPart.deletingPathExtension().lastPathComponent
+        let parts = try discoverParts(in: directory, baseName: baseName, startIndex: startIndex)
+        guard parts.count > 1 else { return nil }
+        return try totalSize(of: parts)
+    }
+
+    public func availableBytes(onVolumeContaining url: URL) throws -> Int64 {
+        try Self.volumeAvailableBytes(at: url)
+    }
+
+    private func totalSize(of parts: [URL]) throws -> Int64 {
+        try parts.reduce(0 as Int64) { acc, url in
+            let attrs = try fileManager.attributesOfItem(atPath: url.path)
+            return acc + (attrs[.size] as? Int64 ?? 0)
         }
     }
 

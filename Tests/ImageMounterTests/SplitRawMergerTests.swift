@@ -173,6 +173,31 @@ private enum SplitRawTestSupport {
     }
 }
 
+@Test func splitRawMerger_requiredCopySizeIsNilForSinglePart() throws {
+    let directory = try SplitRawTestSupport.makeDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 1, marker: 0xD1)
+
+    let size = try SplitRawMerger().requiredCopySize(
+        for: directory.appendingPathComponent("foo.001")
+    )
+    #expect(size == nil)
+}
+
+@Test func splitRawMerger_requiredCopySizeSumsMultiPartSet() throws {
+    let directory = try SplitRawTestSupport.makeDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 0, marker: 0x01)
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 1, marker: 0x02)
+
+    let size = try SplitRawMerger().requiredCopySize(
+        for: directory.appendingPathComponent("foo.000")
+    )
+    #expect(size == 8)
+}
+
 @Test func splitRawMerger_throwsInsufficientSpaceBeforeWrite() throws {
     let directory = try SplitRawTestSupport.makeDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
