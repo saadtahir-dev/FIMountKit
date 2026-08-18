@@ -26,7 +26,7 @@ public final class SplitRawImageMounter: ImageMounter, @unchecked Sendable {
     public func mount(url: URL, options: MountOptions = .default, log: ImageMounterLogHandler? = nil) async throws -> MountResult {
         Logger.log(log, "Mounting split RAW starting at: \(url.path)", component: .splitRawMounter)
         let output = options.workspaceDirectory?
-            .appendingPathComponent("\(UUID().uuidString).raw")
+            .appendingPathComponent("merged.raw")
         let handle = try merger.merge(url, output: output, log: log)
         Logger.log(log, "Merged file: \(handle.mergedFile.path) (temporary=\(handle.isTemporary))", component: .splitRawMounter)
 

@@ -213,6 +213,31 @@ private enum SplitRawTestSupport {
     #expect(FileManager.default.fileExists(atPath: output.path))
 }
 
+@Test func splitRawMerger_reusesCompleteExistingOutput() throws {
+    let directory = try SplitRawTestSupport.makeDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 0, marker: 0x01)
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 1, marker: 0x02)
+
+    let output = directory.appendingPathComponent("merged.raw")
+    _ = try SplitRawMerger().merge(
+        directory.appendingPathComponent("foo.000"),
+        output: output,
+        log: nil
+    )
+
+    try Data(repeating: 0xEE, count: 8).write(to: output)
+    let handle = try SplitRawMerger().merge(
+        directory.appendingPathComponent("foo.000"),
+        output: output,
+        log: nil
+    )
+
+    #expect(handle.mergedFile.path == output.path)
+    #expect(try SplitRawTestSupport.mergedData(at: output) == Data(repeating: 0xEE, count: 8))
+}
+
 @Test func splitRawImageMounter_singlePartMountFailure_doesNotDeleteOriginal() async throws {
     let directory = try SplitRawTestSupport.makeDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }

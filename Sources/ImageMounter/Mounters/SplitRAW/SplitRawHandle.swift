@@ -83,10 +83,6 @@ public final class SplitRawMerger: @unchecked Sendable {
 
         var created = false
         do {
-            if fileManager.fileExists(atPath: mergedURL.path) {
-                throw MountError.mountFailed(reason: "Output file already exists at \(mergedURL.path)")
-            }
-
             let parent = mergedURL.deletingLastPathComponent()
             try fileManager.createDirectory(
                 at: parent,
@@ -96,6 +92,16 @@ public final class SplitRawMerger: @unchecked Sendable {
             let totalSize = try parts.reduce(0 as Int64) { acc, url in
                 let attrs = try fileManager.attributesOfItem(atPath: url.path)
                 return acc + (attrs[.size] as? Int64 ?? 0)
+            }
+
+            if fileManager.fileExists(atPath: mergedURL.path) {
+                let existingSize = (try fileManager.attributesOfItem(atPath: mergedURL.path)[.size] as? Int64) ?? 0
+                if existingSize == totalSize {
+                    Logger.log(log, "Reusing existing merged file: \(mergedURL.path)", component: .splitRawMerger)
+                    return SplitRawHandle(mergedFile: mergedURL, isTemporary: isTemporary)
+                }
+                Logger.log(log, "Removing incomplete merged file: \(mergedURL.path)", component: .splitRawMerger)
+                try fileManager.removeItem(at: mergedURL)
             }
 
             // dest volume only — does not check the evidence volume; case-vs-source mismatch can still fail on read.
