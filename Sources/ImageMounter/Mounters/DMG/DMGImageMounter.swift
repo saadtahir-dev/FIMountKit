@@ -39,17 +39,10 @@ public final class DMGImageMounter: ImageMounter, @unchecked Sendable {
         var parsedForCleanup: HDIUtilMountInfo?
 
         do {
-            var arguments = [
-                "attach",
-                url.path,
-                "-nobrowse",
-                "-noverify",
-                "-plist"
-            ]
-            
-            if let mountPoint = options.volumeMountPoint {
-                arguments += ["-mountpoint", mountPoint.path]
-            }
+            let arguments = HDIUtilHelper.attachArguments(
+                imagePath: url.path,
+                mountPoint: options.volumeMountPoint
+            )
 
             Logger.log(
                 log,

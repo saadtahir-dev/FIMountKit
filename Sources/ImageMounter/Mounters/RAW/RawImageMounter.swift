@@ -35,19 +35,11 @@ public final class RawImageMounter: ImageMounter, @unchecked Sendable {
         var parsedForCleanup: HDIUtilMountInfo?
 
         do {
-            var arguments: [String] = [
-                "attach",
-                url.path,
-                "-imagekey",
-                "diskimage-class=CRawDiskImage",
-                "-nobrowse",
-                "-noverify",
-                "-plist"
-            ]
-            
-            if let mountPoint = options.volumeMountPoint {
-                arguments += ["-mountpoint", mountPoint.path]
-            }
+            let arguments = HDIUtilHelper.attachArguments(
+                imagePath: url.path,
+                extra: ["-imagekey", "diskimage-class=CRawDiskImage"],
+                mountPoint: options.volumeMountPoint
+            )
 
             Logger.log(
                 log,

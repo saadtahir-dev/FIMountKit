@@ -10,6 +10,32 @@
 import Foundation
 
 enum HDIUtilHelper {
+    /// Shared `hdiutil attach` argv. Evidence images are always read-only.
+    static func attachArguments(
+        imagePath: String,
+        extra: [String] = [],
+        mountPoint: URL? = nil
+    ) -> [String] {
+        var arguments = [
+            "attach",
+            imagePath
+        ]
+        
+        arguments.append(contentsOf: extra)
+        arguments += [
+            "-readonly",
+            "-nobrowse",
+            "-noverify",
+            "-plist"
+        ]
+        
+        if let mountPoint {
+            arguments += ["-mountpoint", mountPoint.path]
+        }
+        
+        return arguments
+    }
+
     static func fetchAttachedDevices(
         using executor: ProcessExecutor,
         log: ImageMounterLogHandler? = nil

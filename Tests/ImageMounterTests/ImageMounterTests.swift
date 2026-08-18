@@ -11,6 +11,28 @@ import Foundation
 import Testing
 @testable import FIMountKit
 
+@Test func hdiutil_attachArguments_forceReadOnly() {
+    let raw = HDIUtilHelper.attachArguments(
+        imagePath: "/tmp/disk.dd",
+        extra: ["-imagekey", "diskimage-class=CRawDiskImage"]
+    )
+    let dmg = HDIUtilHelper.attachArguments(imagePath: "/tmp/disk.dmg")
+    let withMountPoint = HDIUtilHelper.attachArguments(
+        imagePath: "/tmp/disk.dmg",
+        mountPoint: URL(fileURLWithPath: "/Volumes/Evidence")
+    )
+
+    for arguments in [raw, dmg, withMountPoint] {
+        #expect(arguments.contains("-readonly"))
+        #expect(!arguments.contains("-shadow"))
+        #expect(!arguments.contains("-readwrite"))
+        #expect(arguments.first == "attach")
+    }
+
+    #expect(withMountPoint.contains("-mountpoint"))
+    #expect(withMountPoint.contains("/Volumes/Evidence"))
+}
+
 @Test func imageFormatDetector_extensionMapping() throws {
     let detector = ImageFormatDetector()
 
