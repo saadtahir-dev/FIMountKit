@@ -10,7 +10,17 @@
 import Foundation
 
 enum HDIUtilHelper {
-    /// Shared `hdiutil attach` argv. Evidence images are always read-only.
+    /// Shared `hdiutil attach` argv. Evidence images are always `-readonly`.
+    ///
+    /// `-shadow` is not used. A shadow file would let macOS replay a dirty
+    /// journal without touching the image, but it also attaches the volume
+    /// read/write (writes go to the overlay). Evidence is never mounted that way.
+    ///
+    /// A dirty APFS image is one captured while the volume was not cleanly
+    /// unmounted — typically a live acquisition, or a hard power-off. The
+    /// journal still has unreplayed transactions. A read-write mount would
+    /// replay them and alter the evidence. `-readonly` blocks that write, so
+    /// attach may fail on those images instead of mutating them.
     static func attachArguments(
         imagePath: String,
         extra: [String] = [],
