@@ -107,15 +107,14 @@ private enum SplitRawTestSupport {
 
     try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 1, marker: 0xD1)
 
+    let original = directory.appendingPathComponent("foo.001")
     let output = directory.appendingPathComponent("merged.raw")
-    let handle = try SplitRawMerger().merge(
-        directory.appendingPathComponent("foo.001"),
-        output: output,
-        log: nil
-    )
+    let handle = try SplitRawMerger().merge(original, output: output, log: nil)
 
-    let merged = try SplitRawTestSupport.mergedData(at: handle.mergedFile)
-    #expect(merged == Data(repeating: 0xD1, count: 4))
+    #expect(handle.mergedFile.path == original.path)
+    #expect(handle.isTemporary == false)
+    #expect(try SplitRawTestSupport.mergedData(at: original) == Data(repeating: 0xD1, count: 4))
+    #expect(FileManager.default.fileExists(atPath: output.path) == false)
 }
 
 @Test func splitRawMerger_rejectsGap() throws {
@@ -172,4 +171,79 @@ private enum SplitRawTestSupport {
     #expect(throws: MountError.self) {
         _ = try SplitRawMerger().merge(directory.appendingPathComponent("foo.999"), log: nil)
     }
+}
+
+@Test func splitRawMerger_throwsInsufficientSpaceBeforeWrite() throws {
+    let directory = try SplitRawTestSupport.makeDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 0, marker: 0x01)
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 1, marker: 0x02)
+
+    let output = directory.appendingPathComponent("merged.raw")
+    let merger = SplitRawMerger(availableBytes: { _ in 0 })
+
+    #expect(throws: MountError.insufficientSpace(required: 8, available: 0)) {
+        _ = try merger.merge(
+            directory.appendingPathComponent("foo.000"),
+            output: output,
+            log: nil
+        )
+    }
+    #expect(FileManager.default.fileExists(atPath: output.path) == false)
+}
+
+@Test func splitRawMerger_mergesWhenAvailableEqualsTotalSize() throws {
+    let directory = try SplitRawTestSupport.makeDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 0, marker: 0x01)
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 1, marker: 0x02)
+
+    let output = directory.appendingPathComponent("merged.raw")
+    let merger = SplitRawMerger(availableBytes: { _ in 8 })
+    let handle = try merger.merge(
+        directory.appendingPathComponent("foo.000"),
+        output: output,
+        log: nil
+    )
+
+    let merged = try SplitRawTestSupport.mergedData(at: handle.mergedFile)
+    #expect(merged.count == 8)
+    #expect(FileManager.default.fileExists(atPath: output.path))
+}
+
+@Test func splitRawImageMounter_singlePartMountFailure_doesNotDeleteOriginal() async throws {
+    let directory = try SplitRawTestSupport.makeDirectory()
+    defer { try? FileManager.default.removeItem(at: directory) }
+
+    try SplitRawTestSupport.writePart(in: directory, baseName: "foo", index: 0, marker: 0xD1)
+    let original = directory.appendingPathComponent("foo.000")
+
+    let workspace = directory.appendingPathComponent("workspace", isDirectory: true)
+    try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+
+    struct ThrowingImageMounter: ImageMounter {
+        let supportedTypes: [ImageType] = [.raw]
+        func mount(url: URL, options: MountOptions, log: ImageMounterLogHandler?) async throws -> MountResult {
+            throw MountError.mountFailed(reason: "forced attach failure")
+        }
+        func unmount(_ result: MountResult, log: ImageMounterLogHandler?) async throws {}
+    }
+
+    let mounter = SplitRawImageMounter(rawMounter: ThrowingImageMounter())
+    let options = MountOptions(workspaceDirectory: workspace)
+
+    await #expect(throws: MountError.self) {
+        _ = try await mounter.mount(url: original, options: options, log: nil)
+    }
+
+    #expect(FileManager.default.fileExists(atPath: original.path))
+    #expect(try SplitRawTestSupport.mergedData(at: original) == Data(repeating: 0xD1, count: 4))
+
+    let leftovers = try FileManager.default.contentsOfDirectory(
+        at: workspace,
+        includingPropertiesForKeys: nil
+    )
+    #expect(leftovers.filter { $0.pathExtension == "raw" }.isEmpty)
 }

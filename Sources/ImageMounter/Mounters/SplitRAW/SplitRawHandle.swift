@@ -23,10 +23,16 @@ public struct SplitRawHandle: Sendable, Equatable {
 public final class SplitRawMerger: @unchecked Sendable {
     private let fileManager: FileManager
     private let chunkSize: Int
+    private let availableBytes: (URL) throws -> Int64
 
-    public init(fileManager: FileManager = .default, chunkSize: Int = 4 * 1024 * 1024) {
+    public init(
+        fileManager: FileManager = .default,
+        chunkSize: Int = 4 * 1024 * 1024,
+        availableBytes: ((URL) throws -> Int64)? = nil
+    ) {
         self.fileManager = fileManager
         self.chunkSize = chunkSize
+        self.availableBytes = availableBytes ?? Self.volumeAvailableBytes
     }
 
     public func merge(_ firstPart: URL, output: URL? = nil, log: ImageMounterLogHandler? = nil) throws -> SplitRawHandle {
@@ -52,6 +58,16 @@ public final class SplitRawMerger: @unchecked Sendable {
             component: .splitRawMerger
         )
 
+        if parts.count == 1 {
+            let unusedOutput = output.map(\.path) ?? "nil"
+            Logger.log(
+                log,
+                "Single-part split RAW: using original file (no merge). output path unused: \(unusedOutput)",
+                component: .splitRawMerger
+            )
+            return SplitRawHandle(mergedFile: firstPart, isTemporary: false)
+        }
+
         let mergedURL: URL
         let isTemporary: Bool
         if let output {
@@ -71,21 +87,29 @@ public final class SplitRawMerger: @unchecked Sendable {
                 throw MountError.mountFailed(reason: "Output file already exists at \(mergedURL.path)")
             }
 
+            let parent = mergedURL.deletingLastPathComponent()
             try fileManager.createDirectory(
-                at: mergedURL.deletingLastPathComponent(),
+                at: parent,
                 withIntermediateDirectories: true
             )
-
-            guard fileManager.createFile(atPath: mergedURL.path, contents: nil) else {
-                throw MountError.mountFailed(reason: "Failed to create merged file at \(mergedURL.path)")
-            }
-            created = true
 
             let totalSize = try parts.reduce(0 as Int64) { acc, url in
                 let attrs = try fileManager.attributesOfItem(atPath: url.path)
                 return acc + (attrs[.size] as? Int64 ?? 0)
             }
+
+            // dest volume only — does not check the evidence volume; case-vs-source mismatch can still fail on read.
+            let available = try availableBytes(parent)
+            if available < totalSize {
+                throw MountError.insufficientSpace(required: totalSize, available: available)
+            }
+
             Logger.log(log, "Preallocating merged file size: \(totalSize) bytes", component: .splitRawMerger)
+
+            guard fileManager.createFile(atPath: mergedURL.path, contents: nil) else {
+                throw MountError.mountFailed(reason: "Failed to create merged file at \(mergedURL.path)")
+            }
+            created = true
 
             let fd = open(mergedURL.path, O_RDWR | O_CLOEXEC)
             if fd >= 0 {
@@ -114,30 +138,41 @@ public final class SplitRawMerger: @unchecked Sendable {
                 }
 
                 var partError: Error?
-                autoreleasepool {
-                    do {
-                        let readHandle = try FileHandle(forReadingFrom: part)
-                        defer { try? readHandle.close() }
+                do {
+                    let readHandle = try FileHandle(forReadingFrom: part)
+                    defer { try? readHandle.close() }
 
-                        while true {
-                            if Task.isCancelled {
-                                throw CancellationError()
-                            }
+                    while true {
+                        if Task.isCancelled {
+                            throw CancellationError()
+                        }
 
-                            let data = try readHandle.read(upToCount: chunkSize) ?? Data()
-                            if data.isEmpty { break }
+                        var reachedEOF = false
+                        autoreleasepool {
+                            // per-chunk drain required; wrapping the whole part reintroduces unbounded RAM.
+                            do {
+                                let data = try readHandle.read(upToCount: chunkSize) ?? Data()
+                                if data.isEmpty {
+                                    reachedEOF = true
+                                    return
+                                }
 
-                            try writeHandle.write(contentsOf: data)
-                            written += Int64(data.count)
+                                try writeHandle.write(contentsOf: data)
+                                written += Int64(data.count)
 
-                            if written >= nextLog {
-                                Logger.log(log, "Merged \(written / (1024 * 1024)) MB...", component: .splitRawMerger)
-                                nextLog += 50 * 1024 * 1024
+                                if written >= nextLog {
+                                    Logger.log(log, "Merged \(written / (1024 * 1024)) MB...", component: .splitRawMerger)
+                                    nextLog += 50 * 1024 * 1024
+                                }
+                            } catch {
+                                partError = error
                             }
                         }
-                    } catch {
-                        partError = error
+                        if reachedEOF { break }
+                        if let partError { throw partError }
                     }
+                } catch {
+                    partError = error
                 }
                 if let partError {
                     throw partError
@@ -156,6 +191,15 @@ public final class SplitRawMerger: @unchecked Sendable {
             }
             throw error
         }
+    }
+
+    private static func volumeAvailableBytes(at url: URL) throws -> Int64 {
+        var stats = statfs()
+        let result = url.path.withCString { statfs($0, &stats) }
+        guard result == 0 else {
+            throw MountError.mountFailed(reason: "Failed to inspect free space at \(url.path)")
+        }
+        return Int64(stats.f_bavail) * Int64(stats.f_bsize)
     }
 
     private func discoverParts(in directory: URL, baseName: String, startIndex: Int) throws -> [URL] {

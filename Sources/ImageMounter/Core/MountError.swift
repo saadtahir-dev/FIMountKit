@@ -20,6 +20,8 @@ public enum MountError: Error, Sendable, Equatable {
     case invalidPlist
 
     case exposeFailed(reason: String)
+
+    case insufficientSpace(required: Int64, available: Int64)
 }
 
 extension MountError: LocalizedError {
@@ -45,6 +47,9 @@ extension MountError: LocalizedError {
         
         case .exposeFailed(let reason):
             return reason
+
+        case .insufficientSpace(let required, let available):
+            return "Not enough space to merge split RAW: need \(required) bytes, have \(available) bytes"
         }
     }
 }

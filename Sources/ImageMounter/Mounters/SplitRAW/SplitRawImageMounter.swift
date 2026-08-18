@@ -13,11 +13,11 @@ public final class SplitRawImageMounter: ImageMounter, @unchecked Sendable {
     public let supportedTypes: [ImageType] = [.splitRaw]
 
     private let merger: SplitRawMerger
-    private let rawMounter: RawImageMounter
+    private let rawMounter: any ImageMounter
 
     public init(
         merger: SplitRawMerger = SplitRawMerger(),
-        rawMounter: RawImageMounter = RawImageMounter()
+        rawMounter: any ImageMounter = RawImageMounter()
     ) {
         self.merger = merger
         self.rawMounter = rawMounter
